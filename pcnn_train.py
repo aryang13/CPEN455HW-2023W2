@@ -34,14 +34,14 @@ def train_or_test(model, data_loader, optimizer, loss_op, device, args, epoch, m
             loss = loss_op(model_input, model_output)
             loss_tracker.update(loss.item()/deno)
             if mode != 'training':
-                losses, preds = model.classify(model_input, device)
+                losses, preds = model.classify_image(model_input, device)
                 accuracy_tracker.update(torch.sum(preds == categories).item()/args.batch_size)
             else:
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
         else:
-            losses, preds = model.classify(model_input, device)
+            losses, preds = model.classify_image(model_input, device)
             loss_tracker.update(torch.sum(losses).item()/deno)
             accuracy_tracker.update(torch.sum(preds == categories).item()/args.batch_size)
         

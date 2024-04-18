@@ -99,6 +99,10 @@ class PixelCNN(nn.Module):
 
 
     def forward(self, x, label, sample=False):
+        label_embedding = self.embedding(label)
+        label_embedding = label_embedding.view(-1, self.input_channels, 32, 32)
+        x = x + label_embedding
+
         # similar as done in the tf repo :
         if self.init_padding is not sample:
             xs = [int(y) for y in x.size()]
@@ -110,10 +114,6 @@ class PixelCNN(nn.Module):
             padding = Variable(torch.ones(xs[0], 1, xs[2], xs[3]), requires_grad=False)
             padding = padding.cuda() if x.is_cuda else padding
             x = torch.cat((x, padding), 1)
-
-        label_embedding = self.embedding(label)
-        label_embedding = label_embedding.view(-1, self.input_channels, 32, 32)
-        x = x + label_embedding
 
         ###      UP PASS    ###
         x = x if sample else torch.cat((x, self.init_padding), 1)

@@ -1,6 +1,6 @@
 import torch.nn as nn
 from layers import *
-
+from dataset import *
 
 class PixelCNNLayer_up(nn.Module):
     def __init__(self, nr_resnet, nr_filters, resnet_nonlinearity):
@@ -52,7 +52,7 @@ class PixelCNNLayer_down(nn.Module):
 
 class PixelCNN(nn.Module):
     def __init__(self, nr_resnet=5, nr_filters=80, nr_logistic_mix=10,
-                    resnet_nonlinearity='concat_elu', input_channels=3):
+                    resnet_nonlinearity='concat_elu', input_channels=3, num_classes=4):
         super(PixelCNN, self).__init__()
         if resnet_nonlinearity == 'concat_elu' :
             self.resnet_nonlinearity = lambda x : concat_elu(x)
@@ -95,9 +95,10 @@ class PixelCNN(nn.Module):
         num_mix = 3 if self.input_channels == 1 else 10
         self.nin_out = nin(nr_filters, num_mix * nr_logistic_mix)
         self.init_padding = None
+        self.embedding = nn.Embedding(num_classes, input_channels*32*32)
 
 
-    def forward(self, x, sample=False):
+    def forward(self, x, label, sample=False):
         # similar as done in the tf repo :
         if self.init_padding is not sample:
             xs = [int(y) for y in x.size()]
@@ -109,6 +110,10 @@ class PixelCNN(nn.Module):
             padding = Variable(torch.ones(xs[0], 1, xs[2], xs[3]), requires_grad=False)
             padding = padding.cuda() if x.is_cuda else padding
             x = torch.cat((x, padding), 1)
+
+        label_embedding = self.embedding(label)
+        label_embedding = label_embedding.view(-1, self.input_channels, 32, 32)
+        x = x + label_embedding
 
         ###      UP PASS    ###
         x = x if sample else torch.cat((x, self.init_padding), 1)
@@ -144,7 +149,19 @@ class PixelCNN(nn.Module):
 
         return x_out
     
-    
+    def classify_image(self, x, device):
+        B, _, _, _ = x.shape
+        num_classes = len(my_bidict)
+        losses = torch.zeros((num_classes, B)).to(device)
+
+        for i in range(num_classes):
+            label = torch.tensor([i]*B).to(device)
+            x_out = self.forward(x, label)
+            losses[i] = discretized_mix_logistic_loss(x, x_out, False)
+        
+        min_losses, min_labels = torch.min(losses, dim=0)
+        return min_losses, min_labels
+
 class random_classifier(nn.Module):
     def __init__(self, NUM_CLASSES):
         super(random_classifier, self).__init__()

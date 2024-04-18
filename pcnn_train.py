@@ -22,21 +22,34 @@ def train_or_test(model, data_loader, optimizer, loss_op, device, args, epoch, m
         
     deno =  args.batch_size * np.prod(args.obs) * np.log(2.)        
     loss_tracker = mean_tracker()
+    accuracy_tracker = mean_tracker()
     
     for batch_idx, item in enumerate(tqdm(data_loader)):
-        model_input, _ = item
+        model_input, item_labels = item
         model_input = model_input.to(device)
-        model_output = model(model_input)
-        loss = loss_op(model_input, model_output)
-        loss_tracker.update(loss.item()/deno)
-        if mode == 'training':
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
+
+        if mode != "test":
+            labels = torch.tensor([my_bidict[item] for item in item_labels], dtype=torch.int64).to(device)
+            model_output = model(model_input, labels)
+            loss = loss_op(model_input, model_output)
+            loss_tracker.update(loss.item()/deno)
+            if mode != 'training':
+                losses, preds = model.classify(model_input, device)
+                accuracy_tracker.update(torch.sum(preds == categories).item()/args.batch_size)
+            else:
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+        else:
+            losses, preds = model.classify(model_input, device)
+            loss_tracker.update(torch.sum(losses).item()/deno)
+            accuracy_tracker.update(torch.sum(preds == categories).item()/args.batch_size)
         
     if args.en_wandb:
         wandb.log({mode + "-Average-BPD" : loss_tracker.get_mean()})
         wandb.log({mode + "-epoch": epoch})
+        if mode != 'training':
+            wandb.log({mode + "-Accuracy": accuracy_tracker.get_mean()})
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -178,7 +191,7 @@ if __name__ == '__main__':
     sample_op = lambda x : sample_from_discretized_mix_logistic(x, args.nr_logistic_mix)
 
     model = PixelCNN(nr_resnet=args.nr_resnet, nr_filters=args.nr_filters, 
-                input_channels=input_channels, nr_logistic_mix=args.nr_logistic_mix)
+                input_channels=input_channels, nr_logistic_mix=args.nr_logistic_mix, num_classes=len(my_bidict))
     model = model.to(device)
 
     if args.load_params:
@@ -220,7 +233,8 @@ if __name__ == '__main__':
         
         if epoch % args.sampling_interval == 0:
             print('......sampling......')
-            sample_t = sample(model, args.sample_batch_size, args.obs, sample_op)
+            labels = torch.randint(0, len(my_bidict), (args.sample_batch_size,)).to(next(model.parameters()).device)
+            sample_t = sample(model, args.sample_batch_size, args.obs, sample_op, labels)
             sample_t = rescaling_inv(sample_t)
             save_images(sample_t, args.sample_dir)
             sample_result = wandb.Image(sample_t, caption="epoch {}".format(epoch))

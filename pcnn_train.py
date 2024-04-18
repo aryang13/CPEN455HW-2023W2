@@ -22,7 +22,6 @@ def train_or_test(model, data_loader, optimizer, loss_op, device, args, epoch, m
         
     deno =  args.batch_size * np.prod(args.obs) * np.log(2.)        
     loss_tracker = mean_tracker()
-    train_accuracy_tracker = mean_tracker()
     val_accuracy_tracker = mean_tracker()
     
     for batch_idx, item in enumerate(tqdm(data_loader)):
@@ -34,15 +33,13 @@ def train_or_test(model, data_loader, optimizer, loss_op, device, args, epoch, m
             model_output = model(model_input, labels)
             loss = loss_op(model_input, model_output)
             loss_tracker.update(loss.item()/deno)
-            _, preds = model.classify_image(model_input, device)
             if mode == 'training':
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
-                train_accuracy_tracker.update(torch.sum(preds == labels).item()/args.batch_size)
             else:
+                _, preds = model.classify_image(model_input, device)
                 val_accuracy_tracker.update(torch.sum(preds == labels).item()/args.batch_size)
-
 
         else:
             losses, preds = model.classify_image(model_input, device)
@@ -53,8 +50,6 @@ def train_or_test(model, data_loader, optimizer, loss_op, device, args, epoch, m
         wandb.log({mode + "-epoch": epoch})
         if mode == 'val':
             wandb.log({mode + "-Validation-Accuracy": val_accuracy_tracker.get_mean()})
-        elif mode == 'training':
-            wandb.log({mode + "-Training-Accuracy": train_accuracy_tracker.get_mean()})
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -137,7 +132,11 @@ if __name__ == '__main__':
 
     #set device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    kwargs = {'num_workers':1, 'pin_memory':True, 'drop_last':True}
+    device = torch.device("mps") if torch.backends.mps.is_available() else device
+    if device.type == 'mps':
+        kwargs = {'num_workers':0, 'pin_memory':True, 'drop_last':True}
+    else:
+        kwargs = {'num_workers':1, 'pin_memory':True, 'drop_last':True}
 
     # set data
     if "mnist" in args.dataset:

@@ -22,34 +22,39 @@ def train_or_test(model, data_loader, optimizer, loss_op, device, args, epoch, m
         
     deno =  args.batch_size * np.prod(args.obs) * np.log(2.)        
     loss_tracker = mean_tracker()
-    accuracy_tracker = mean_tracker()
+    train_accuracy_tracker = mean_tracker()
+    val_accuracy_tracker = mean_tracker()
     
     for batch_idx, item in enumerate(tqdm(data_loader)):
         model_input, item_labels = item
         model_input = model_input.to(device)
-        labels = torch.tensor([my_bidict[item] for item in item_labels], dtype=torch.int64).to(device)
-        
+
         if mode != "test":
+            labels = torch.tensor([my_bidict[item] for item in item_labels], dtype=torch.int64).to(device)
             model_output = model(model_input, labels)
             loss = loss_op(model_input, model_output)
             loss_tracker.update(loss.item()/deno)
-            if mode != 'training':
-                losses, preds = model.classify_image(model_input, device)
-                accuracy_tracker.update(torch.sum(preds == labels).item()/args.batch_size)
-            else:
+            _, preds = model.classify_image(model_input, device)
+            if mode == 'training':
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
+                train_accuracy_tracker.update(torch.sum(preds == labels).item()/args.batch_size)
+            else:
+                val_accuracy_tracker.update(torch.sum(preds == labels).item()/args.batch_size)
+
+
         else:
             losses, preds = model.classify_image(model_input, device)
             loss_tracker.update(torch.sum(losses).item()/deno)
-            accuracy_tracker.update(torch.sum(preds == labels).item()/args.batch_size)
         
     if args.en_wandb:
         wandb.log({mode + "-Average-BPD" : loss_tracker.get_mean()})
         wandb.log({mode + "-epoch": epoch})
-        if mode != 'training':
-            wandb.log({mode + "-Accuracy": accuracy_tracker.get_mean()})
+        if mode == 'val':
+            wandb.log({mode + "-Validation-Accuracy": val_accuracy_tracker.get_mean()})
+        elif mode == 'training':
+            wandb.log({mode + "-Training-Accuracy": train_accuracy_tracker.get_mean()})
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

@@ -39,11 +39,11 @@ def train_or_test(model, data_loader, optimizer, loss_op, device, args, epoch, m
                 loss.backward()
                 optimizer.step()
             else:
-                _, preds = model.classify_image(model_input, device)
+                _, preds, _ = model.classify_image(model_input, device)
                 val_accuracy_tracker.update(torch.sum(preds == labels).item()/args.batch_size)
         else:
             # test mode only calculate the loss
-            losses, preds = model.classify_image(model_input, device)
+            losses, preds, _ = model.classify_image(model_input, device)
             loss_tracker.update(torch.sum(losses).item()/deno)
         
     if args.en_wandb:

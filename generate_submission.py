@@ -11,20 +11,25 @@ import csv
 NUM_CLASSES = len(my_bidict)
 
 # And get the predicted label, which is a tensor of shape (batch_size,)
-def get_label(model, model_input, device):
-    _, answer = model.classify_image(model_input, device)
-    return answer
+def get_label_and_logits(model, model_input, device):
+    _, answer, logits = model.classify_image(model_input, device)
+    return answer, logits
 
 def write_to_csv(model, data_loader, device, dataset):
     model.eval()
     all_answer = []
+    test_logits = []
     for _, item in enumerate(tqdm(data_loader)):
         model_input, _ = item
         model_input = model_input.to(device)
-        answer = get_label(model, model_input, device)
+        answer, logits = get_label_and_logits(model, model_input, device)
+        _, B = logits.shape
+        test_logits.append(logits.view(NUM_CLASSES, B).permute(1, 0))
         all_answer.append(answer)
     
     all_answer = torch.cat(all_answer, -1)
+    test_logits = torch.cat(test_logits, -1)
+    print(test_logits)
 
     # used chat gpt where the prompt was: How to write to csv in pytorch with a tensor
     with open("final_result.csv", mode='w', newline='') as file:
@@ -61,7 +66,7 @@ if __name__ == '__main__':
     model = PixelCNN(nr_resnet=1, nr_filters=40, input_channels=3, nr_logistic_mix=5, num_classes=NUM_CLASSES)
     
     model = model.to(device)
-    model.load_state_dict(torch.load('models/conditional_pixelcnn.pth'))
+    model.load_state_dict(torch.load('models/conditional_pixelcnn.pth', map_location=torch.device('cpu')))
     model.eval()
     print('model parameters loaded')
     write_to_csv(model = model, data_loader = dataloader, device = device, dataset=dataset)

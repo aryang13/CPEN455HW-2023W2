@@ -24,7 +24,7 @@ def train_or_test(model, data_loader, optimizer, loss_op, device, args, epoch, m
     loss_tracker = mean_tracker()
     val_accuracy_tracker = mean_tracker()
     
-    for batch_idx, item in enumerate(tqdm(data_loader)):
+    for batch_idx, item in enumerate(data_loader):
         model_input, item_labels = item
         model_input = model_input.to(device)
 
@@ -202,7 +202,8 @@ if __name__ == '__main__':
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
     scheduler = lr_scheduler.StepLR(optimizer, step_size=1, gamma=args.lr_decay)
     
-    for epoch in tqdm(range(args.max_epochs)):
+    for epoch in range(args.max_epochs):
+        print('Epoch {}'.format(epoch) + 'Out of {}'.format(args.max_epochs) + 'epochs')
         train_or_test(model = model, 
                       data_loader = train_loader, 
                       optimizer = optimizer, 

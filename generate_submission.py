@@ -24,12 +24,11 @@ def write_to_csv(model, data_loader, device, dataset):
         model_input = model_input.to(device)
         answer, logits = get_label_and_logits(model, model_input, device)
         _, B = logits.shape
-        test_logits = np.append(test_logits, logits.view(NUM_CLASSES, B).permute(1, 0).detach().numpy())
+        test_logits = np.append(test_logits, logits.view(NUM_CLASSES, B).permute(1, 0).detach().cpu().numpy())
         all_answer.append(answer)
     
     all_answer = torch.cat(all_answer, -1)
     test_logits = test_logits.reshape(-1, NUM_CLASSES)
-    print(test_logits.shape)
 
     np.save("test_logits.npy", test_logits)
 
@@ -68,7 +67,7 @@ if __name__ == '__main__':
     model = PixelCNN(nr_resnet=1, nr_filters=40, input_channels=3, nr_logistic_mix=5, num_classes=NUM_CLASSES)
     
     model = model.to(device)
-    model.load_state_dict(torch.load('models/conditional_pixelcnn.pth', map_location=torch.device("cpu")))
+    model.load_state_dict(torch.load('models/conditional_pixelcnn.pth', map_location=device))
     model.eval()
     print('model parameters loaded')
     write_to_csv(model = model, data_loader = dataloader, device = device, dataset=dataset)

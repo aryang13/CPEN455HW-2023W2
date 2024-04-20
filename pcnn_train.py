@@ -29,6 +29,7 @@ def train_or_test(model, data_loader, optimizer, loss_op, device, args, epoch, m
         model_input = model_input.to(device)
 
         if mode != "test":
+            # only retrieve the labels for training and validation as test does not have any
             labels = torch.tensor([my_bidict[item] for item in item_labels], dtype=torch.int64).to(device)
             model_output = model(model_input, labels)
             loss = loss_op(model_input, model_output)
@@ -40,8 +41,8 @@ def train_or_test(model, data_loader, optimizer, loss_op, device, args, epoch, m
             else:
                 _, preds = model.classify_image(model_input, device)
                 val_accuracy_tracker.update(torch.sum(preds == labels).item()/args.batch_size)
-
         else:
+            # test mode only calculate the loss
             losses, preds = model.classify_image(model_input, device)
             loss_tracker.update(torch.sum(losses).item()/deno)
         
@@ -233,6 +234,7 @@ if __name__ == '__main__':
         
         if epoch % args.sampling_interval == 0:
             print('......sampling......')
+            # get random labels to use for sampling
             labels = torch.randint(0, len(my_bidict), (args.sample_batch_size,)).to(next(model.parameters()).device)
             sample_t = sample(model, args.sample_batch_size, args.obs, sample_op, labels)
             sample_t = rescaling_inv(sample_t)

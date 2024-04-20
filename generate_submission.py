@@ -1,4 +1,4 @@
-# file generates the 
+# file generates the csv file needed for hugging face with the prediction of the model
 
 from torchvision import transforms
 from utils import *
@@ -15,7 +15,7 @@ def get_label(model, model_input, device):
     _, answer = model.classify_image(model_input, device)
     return answer
 
-def classifier(model, data_loader, device, dataset):
+def write_to_csv(model, data_loader, device, dataset):
     model.eval()
     all_answer = []
     for _, item in enumerate(tqdm(data_loader)):
@@ -26,6 +26,7 @@ def classifier(model, data_loader, device, dataset):
     
     all_answer = torch.cat(all_answer, -1)
 
+    # used chat gpt where the prompt was: How to write to csv in pytorch with a tensor
     with open("final_result.csv", mode='w', newline='') as file:
         writer = csv.writer (file)
         writer.writerow(['id', 'label'])
@@ -63,4 +64,4 @@ if __name__ == '__main__':
     model.load_state_dict(torch.load('models/conditional_pixelcnn.pth'))
     model.eval()
     print('model parameters loaded')
-    classifier(model = model, data_loader = dataloader, device = device, dataset=dataset)
+    write_to_csv(model = model, data_loader = dataloader, device = device, dataset=dataset)

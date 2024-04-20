@@ -99,6 +99,7 @@ class PixelCNN(nn.Module):
 
 
     def forward(self, x, label, sample=False):
+        # apply embedding to input before processing
         label_embedding = self.embedding(label)
         label_embedding = label_embedding.view(-1, self.input_channels, 32, 32)
         x = x + label_embedding
@@ -149,16 +150,20 @@ class PixelCNN(nn.Module):
 
         return x_out
     
+    # used the input and the model to classify the image
     def classify_image(self, x, device):
         B, _, _, _ = x.shape
         num_classes = len(my_bidict)
+        # create a tensor to store the losses
         losses = torch.zeros((num_classes, B)).to(device)
 
         for i in range(num_classes):
             label = torch.tensor([i]*B).to(device)
             x_out = self.forward(x, label)
+            # calculate the loss for each image in the batch
             losses[i] = discretized_mix_logistic_loss(x, x_out, False)
         
+        # get the minimum loss and the corresponding label
         min_losses, min_labels = torch.min(losses, dim=0)
         return min_losses, min_labels
 

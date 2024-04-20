@@ -18,18 +18,20 @@ def get_label_and_logits(model, model_input, device):
 def write_to_csv(model, data_loader, device, dataset):
     model.eval()
     all_answer = []
-    test_logits = []
+    test_logits = np.array([])
     for _, item in enumerate(tqdm(data_loader)):
         model_input, _ = item
         model_input = model_input.to(device)
         answer, logits = get_label_and_logits(model, model_input, device)
         _, B = logits.shape
-        test_logits.append(logits.view(NUM_CLASSES, B).permute(1, 0))
+        test_logits = np.append(test_logits, logits.view(NUM_CLASSES, B).permute(1, 0).detach().numpy())
         all_answer.append(answer)
     
     all_answer = torch.cat(all_answer, -1)
-    test_logits = torch.cat(test_logits, -1)
-    print(test_logits)
+    test_logits = test_logits.reshape(-1, NUM_CLASSES)
+    print(test_logits.shape)
+
+    np.save("test_logits.npy", test_logits)
 
     # used chat gpt where the prompt was: How to write to csv in pytorch with a tensor
     with open("final_result.csv", mode='w', newline='') as file:
@@ -66,7 +68,7 @@ if __name__ == '__main__':
     model = PixelCNN(nr_resnet=1, nr_filters=40, input_channels=3, nr_logistic_mix=5, num_classes=NUM_CLASSES)
     
     model = model.to(device)
-    model.load_state_dict(torch.load('models/conditional_pixelcnn.pth', map_location=torch.device('cpu')))
+    model.load_state_dict(torch.load('models/conditional_pixelcnn.pth', map_location=device))
     model.eval()
     print('model parameters loaded')
     write_to_csv(model = model, data_loader = dataloader, device = device, dataset=dataset)
